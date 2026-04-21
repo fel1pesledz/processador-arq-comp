@@ -18,43 +18,36 @@ entity ula is
 end entity;
 
 architecture arq_ula of ula is
-    -- Sinal interno para guardar o resultado temporariamente
-    -- Precisamos dele para poder calcular as flags depois
+    -- Sinal interno para guardar o resultado temporariamente e para as flags
     signal res_interno : unsigned(15 downto 0);
 begin
     
-    -- 1. MULTIPLEXADOR DE OPERAÇÕES (Totalmente concorrente)
+    -- 1. MULTIPLEXADOR DE OPERAÇÕES
     res_interno <= (entrada_A + entrada_B)   when selec_op = "00" else
                    (entrada_A - entrada_B)   when selec_op = "01" else
                    (entrada_A and entrada_B) when selec_op = "10" else
                    (entrada_A or entrada_B)  when selec_op = "11" else
                    (others => '0'); -- Prevenção contra latches indesejados
 
-    -- Conectando o sinal interno à porta de saída
     resultado <= res_interno;
 
 
-    -- 2. LÓGICA DAS FLAGS (Totalmente concorrente)
-    
-    -- Flag Zero (Z): Fica em '1' se todos os bits do resultado forem zero
+    -- Flag Zero: Fica em '1' se todos os bits do resultado forem zero
     flag_zero <= '1' when res_interno = x"0000" else '0';
     
-    -- Flag Negativo (N): É simplesmente a cópia do Bit Mais Significativo (MSB)
+    -- Flag Negativo: É simplesmente a cópia do Bit Mais Significativo (MSB)
     flag_neg <= res_interno(15);
     
-    -- Flag Overflow (V): Avalia o estouro de limite para números sinalizados.
-    -- Só faz sentido avaliar overflow matemático em soma e subtração.
+    -- Flag Overflow: Avalia o estouro de limite para números sinalizados.
     flag_overf <= 
-        -- Regra da Soma: Estoura se os sinais de A e B são iguais, mas o resultado tem sinal diferente.
+        -- Soma: Estoura se os sinais de A e B são iguais e o sinal do resultado diferente.
         ((entrada_A(15) and entrada_B(15) and not res_interno(15)) or 
         (not entrada_A(15) and not entrada_B(15) and res_interno(15))) when selec_op = "00" else
         
-        -- Regra da Subtração (A - B): Estoura se os sinais de A e B são diferentes, 
-        -- e o sinal do resultado fica diferente do sinal de A.
+        -- Subtração: Estoura se os sinais de A e B são diferentes e o sinal do resultado fica diferente do sinal A.
         ((entrada_A(15) and not entrada_B(15) and not res_interno(15)) or 
         (not entrada_A(15) and entrada_B(15) and res_interno(15))) when selec_op = "01" else
         
-        -- Para operações lógicas (AND, OR), não existe overflow matemático.
         '0';
 
 end architecture;
