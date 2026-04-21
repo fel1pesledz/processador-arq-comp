@@ -11,9 +11,9 @@ entity ula is
         resultado : out unsigned(15 downto 0);
         
         -- Flags baseadas no sorteio (BLE e BPL)
-        flag_Z    : out std_logic;
-        flag_N    : out std_logic;
-        flag_V    : out std_logic
+        flag_zero    : out std_logic;
+        flag_neg    : out std_logic;
+        flag_overf    : out std_logic
     );
 end entity;
 
@@ -37,14 +37,14 @@ begin
     -- 2. LÓGICA DAS FLAGS (Totalmente concorrente)
     
     -- Flag Zero (Z): Fica em '1' se todos os bits do resultado forem zero
-    flag_Z <= '1' when res_interno = x"0000" else '0';
+    flag_zero <= '1' when res_interno = x"0000" else '0';
     
     -- Flag Negativo (N): É simplesmente a cópia do Bit Mais Significativo (MSB)
-    flag_N <= res_interno(15);
+    flag_neg <= res_interno(15);
     
     -- Flag Overflow (V): Avalia o estouro de limite para números sinalizados.
     -- Só faz sentido avaliar overflow matemático em soma e subtração.
-    flag_V <= 
+    flag_overf <= 
         -- Regra da Soma: Estoura se os sinais de A e B são iguais, mas o resultado tem sinal diferente.
         ((entrada_A(15) and entrada_B(15) and not res_interno(15)) or 
         (not entrada_A(15) and not entrada_B(15) and res_interno(15))) when selec_op = "00" else
