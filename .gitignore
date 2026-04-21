@@ -1,0 +1,20 @@
+# Arquivos de analise e compilacao do GHDL
+*.cf
+*.o
+
+# Formas de onda e saidas de simulacao
+*.ghw
+*.vcd
+
+# Configuracoes de visualizacao do GTKWave
+*.gtkw
+
+# Executaveis gerados (caso utilizem ghdl -e futuramente)
+*.exe
+out/
+
+# Arquivos temporarios de editores e do Sistema Operacional
+.vscode/
+Thumbs.db
+*.swp
+*~
