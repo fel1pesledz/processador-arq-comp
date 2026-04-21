@@ -7,7 +7,7 @@ end entity;
 
 architecture a_ula_tb of ula_tb is
 
-    -- DECLARAÇÃO DO COMPONENTE: mesma interface do ula.vhd
+    -- DECLARACAO DO COMPONENTE: mesma interface do ula.vhd
     component ula is
         port(
             entrada_A : in unsigned(15 downto 0);
@@ -95,7 +95,7 @@ begin
         s_selec_op <= "11";
         s_entrada_A <= x"AA00";
         s_entrada_B <= x"00BB";
-        
+
         wait;
     end process;
 
