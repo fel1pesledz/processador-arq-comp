@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity datapath is
+entity top is
     port(
         clk          : in std_logic;
         rst          : in std_logic;
@@ -25,7 +25,7 @@ entity datapath is
     );
 end entity;
 
-architecture a_datapath of datapath is
+architecture a_top of top is
 
     -- 1. DECLARACAO DOS COMPONENTES 
     component banco_regs is

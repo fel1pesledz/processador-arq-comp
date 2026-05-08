@@ -2,13 +2,13 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity datapath_tb is
+entity top_tb is
 end entity;
 
-architecture ateste_tb of datapath_tb is
+architecture ateste_tb of top_tb is
 
     -- 1. DECLARAÇÃO DO COMPONENTE TOP LEVEL 
-    component datapath is
+    component top is
         port(
             clk          : in std_logic;
             rst          : in std_logic;
@@ -44,8 +44,8 @@ architecture ateste_tb of datapath_tb is
 
 begin
 
-    -- 4. INSTANCIANDO O DATAPATH 
-    uut: datapath port map(
+    -- 4. INSTANCIANDO O top 
+    uut: top port map(
         clk => clk, rst => rst, wr_en => wr_en,
         reg_r1 => reg_r1, reg_r2 => reg_r2, reg_wr => reg_wr,
         selec_op => selec_op, sel_cte => sel_cte, cte_externa => cte_externa,
