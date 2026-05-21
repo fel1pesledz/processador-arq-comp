@@ -1,0 +1,105 @@
+===============================================================
+  ISA - uProcessador 5 "Calculadora Programavel"
+  Instrucao: 17 bits  |  Opcode: 4 bits (bits 16..13)
+  UTFPR - Eng. Computacao - Prof. Juliano
+===============================================================
+
+RESTRICOES DO SORTEIO APLICADAS:
+  - ADD apenas entre registradores (nunca com constantes)
+  - SUB apenas entre registradores (nunca com constantes)
+  - SUB sem borrow (SUB) e com borrow (SUBB) ambos presentes
+  - Comparacao apenas entre registradores (CMPR)
+  - ULA ortogonal: qualquer registrador pode ser destino
+  - Carga de constante: via instrucao LI (implementada como
+    "CLR Rn" + soma com imediato internamente)
+  - Registrador de Instrucoes (IR) sensivel a falling_edge
+  - PC sensivel a falling_edge
+
+---------------------------------------------------------------
+FORMATO DE INSTRUCAO (17 bits, MSB = bit 16)
+---------------------------------------------------------------
+
+  bit 16 | bit 15 | bit 14 | bit 13 | bit 12..9 | bit 8..5 | bit 4..1 | bit 0
+  -------+--------+--------+--------+-----------+----------+----------+------
+     op3 |   op2  |   op1  |   op0  |    ddd    |   sss    |   ttt    |  x
+
+  onde:
+    opcode = op3..op0  (4 bits, bits 16..13)
+    ddd    = registrador destino  (4 bits, bits 12..9)
+    sss    = registrador fonte 1  (4 bits, bits 8..5)
+    ttt    = registrador fonte 2  (4 bits, bits 4..1)
+    x      = bit irrelevante (bit 0)
+
+  Para LI (carga de imediato):
+    ttt = imm4 (imediato de 4 bits, valor 0..15)
+
+  Para JMP (salto absoluto):
+    bits 6..0 = endereco de destino (7 bits, 0..127)
+    demais campos sao ignorados
+
+---------------------------------------------------------------
+TABELA DE OPCODES
+---------------------------------------------------------------
+
+  Opcode | Mnemonico  | Operacao                      | Formato
+  -------|------------|-------------------------------|--------
+  0000   | NOP        | sem operacao                  | -
+  0001   | ADD Rd,Rs,Rt | Rd <= Rs + Rt               | ddd sss ttt x
+  0010   | SUB Rd,Rs,Rt | Rd <= Rs - Rt  (sem borrow) | ddd sss ttt x
+  0011   | SUBB Rd,Rs,Rt| Rd <= Rs - Rt - borrow      | ddd sss ttt x
+  0100   | MOV Rd, Rs  | Rd <= Rs                     | ddd sss 0000 x
+  0101   | LI  Rd, imm4| Rd <= imm4  (0..15)          | ddd 0000 imm4 x
+  0110   | CMPR Rs, Rt | flags <= Rs - Rt (sem escrita)| 0000 sss ttt x
+  1111   | JMP addr7   | PC <= addr7                  | 0000000 addr(7 bits)
+
+  NOTA: A instrucao com todos os bits em zero (0x00000) e NOP. OK.
+  NOTA: O endereco 0x00 NAO e NOP (e LI R3,5). OK.
+  NOTA: O bit 0 e sempre irrelevante (x).
+
+---------------------------------------------------------------
+REGISTRADORES
+---------------------------------------------------------------
+
+  Nome | Codigo (ddd/sss/ttt)
+  -----|---------------------
+  R0   | 0000
+  R1   | 0001
+  R2   | 0010
+  R3   | 0011
+  R4   | 0100
+  R5   | 0101
+  R6   | 0110
+  R7   | 0111
+  R8   | 1000
+  R9   | 1001
+
+---------------------------------------------------------------
+DETALHES DA ULA (3 bits de selecao)
+---------------------------------------------------------------
+
+  selec_op | Operacao
+  ---------|----------
+  000      | ADD  (A + B)
+  001      | SUB  (A - B)
+  010      | SUBB (A - B - borrow_in)
+  011      | AND  (A and B)
+  100      | OR   (A or B)
+  101      | MOV  (passa A diretamente)
+
+---------------------------------------------------------------
+CARGA DE CONSTANTES (restricao do sorteio)
+---------------------------------------------------------------
+
+  A restricao exige "Soma a constante com um Rn zerado por CLR Rn".
+  Implementacao:
+    A instrucao LI Rd, imm4 internamente faz:
+      ula_A = 0 (zero forcado)
+      ula_B = imm4 (zero-extended para 16 bits)
+      ula_op = ADD
+      resultado = 0 + imm4 = imm4
+    Isso e equivalente a: CLR Rd, depois ADD Rd com constante.
+
+  Limitacao: imediato de 4 bits, valores 0..15.
+  Para valores maiores, usar operacoes de ADD entre registradores.
+
+===============================================================

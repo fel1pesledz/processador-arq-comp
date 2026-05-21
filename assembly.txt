@@ -1,0 +1,80 @@
+===============================================================
+  PROGRAMA TESTE - uProcessador 5 "Calculadora Programavel"
+  Assembly e codificacao na ROM
+===============================================================
+
+OBJETIVO DO PROGRAMA:
+  A. Carrega R3 com o valor 5
+  B. Carrega R4 com 8
+  C. Soma R3 com R4 e guarda em R5
+  D. Subtrai 1 de R5
+  E. Salta para o endereco 20
+  F. Zera R5 (NUNCA sera executada)
+  G. No endereco 20, copia R5 para R3
+  H. Salta para o passo C (endereco 2)
+  I. Zera R3 (NUNCA sera executada)
+
+SEQUENCIA ESPERADA DE R5: 12, 19, 26, 33, 40, 47, ...
+
+VERIFICACAO:
+  Iter 1: R3=5,  R4=8 -> R5=13-1=12  (0x0C) OK
+  Iter 2: R3=12, R4=8 -> R5=20-1=19  (0x13) OK
+  Iter 3: R3=19, R4=8 -> R5=27-1=26  (0x1A) OK
+  Iter 4: R3=26, R4=8 -> R5=34-1=33  (0x21) OK
+  Iter 5: R3=33, R4=8 -> R5=41-1=40  (0x28) OK
+  Iter 6: R3=40, R4=8 -> R5=48-1=47  (0x2F) OK
+
+---------------------------------------------------------------
+CODIGO ASSEMBLY
+---------------------------------------------------------------
+
+End. | Assembly              | Passo | Descricao
+-----|------------------------|-------|----------------------------
+  0  | LI   R3, 5            | A     | R3 <= 5
+  1  | LI   R4, 8            | B     | R4 <= 8
+  2  | ADD  R5, R3, R4       | C     | R5 <= R3 + R4   <label C>
+  3  | LI   R6, 1            | (aux) | R6 <= 1  (constante para Passo D)
+  4  | SUB  R5, R5, R6       | D     | R5 <= R5 - 1
+  5  | JMP  20               | E     | PC <= 20
+  6  | LI   R5, 0            | F     | R5 <= 0  (NUNCA EXECUTADA)
+  7  | NOP                   | -     | preenchimento
+  ...| NOP                   | -     | preenchimento (end. 8..19)
+ 20  | MOV  R3, R5           | G     | R3 <= R5
+ 21  | JMP  2                | H     | PC <= 2  (volta ao label C)
+ 22  | LI   R3, 0            | I     | R3 <= 0  (NUNCA EXECUTADA)
+
+OBSERVACOES:
+  - R6 e carregado com 1 antes de cada subtracao (Passo D).
+    Como o loop volta ao endereco 2 (Passo C) e nao ao 3,
+    R6 seria recarregado apenas se o JMP voltasse antes.
+    Na verdade o loop volta ao end. 2, entao o caminho e:
+      2 (ADD), 3 (LI R6,1), 4 (SUB), 5 (JMP 20), 20 (MOV), 21 (JMP 2)
+    Portanto R6=1 e sempre recarregado antes da subtracao. OK.
+
+  - A instrucao no endereco 0 NAO e NOP (e LI R3,5). Criterio atendido.
+  - NOP = todos os bits zero = 0x00000. Criterio atendido.
+  - As instrucoes nos enderecos 6 (F) e 22 (I) nunca sao executadas. OK.
+
+---------------------------------------------------------------
+CODIFICACAO BINARIA (17 bits)
+---------------------------------------------------------------
+
+  Formato: opcode(4) ddd(4) sss(4) ttt/imm(4) x(1)
+
+End. | Assembly         | Binario (17 bits)   | Hex (aprox.)
+-----|------------------|--------------------|-------------
+  0  | LI R3,5          | 0101 0011 0000 0101 0 | 0xA60A
+  1  | LI R4,8          | 0101 0100 0000 1000 0 | 0xA810
+  2  | ADD R5,R3,R4     | 0001 0101 0011 0100 0 | 0x2A68
+  3  | LI R6,1          | 0101 0110 0000 0001 0 | 0xAC02
+  4  | SUB R5,R5,R6     | 0010 0101 0101 0110 0 | 0x4AAC
+  5  | JMP 20           | 1111 0000 0000 1010 0 | 0xE014
+  6  | LI R5,0          | 0101 0101 0000 0000 0 | 0xAA00
+7-19 | NOP              | 0000 0000 0000 0000 0 | 0x0000
+ 20  | MOV R3,R5        | 0100 0011 0101 0000 0 | 0x86A0
+ 21  | JMP 2            | 1111 0000 0000 0001 0 | 0xE002
+ 22  | LI R3,0          | 0101 0011 0000 0000 0 | 0xA600
+
+---------------------------------------------------------------
+Ver rom.vhd para a codificacao completa em VHDL com B"..." literais.
+===============================================================
