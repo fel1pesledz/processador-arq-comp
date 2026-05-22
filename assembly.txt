@@ -61,8 +61,8 @@ CODIFICACAO BINARIA (17 bits)
 
   Formato: opcode(4) ddd(4) sss(4) ttt/imm(4) x(1)
 
-End. | Assembly         | Binario (17 bits)   | Hex (aprox.)
------|------------------|--------------------|-------------
+End. | Assembly         | Binario (17 bits)     | Hex (aprox.)
+-----|------------------|-----------------------|-------------
   0  | LI R3,5          | 0101 0011 0000 0101 0 | 0xA60A
   1  | LI R4,8          | 0101 0100 0000 1000 0 | 0xA810
   2  | ADD R5,R3,R4     | 0001 0101 0011 0100 0 | 0x2A68

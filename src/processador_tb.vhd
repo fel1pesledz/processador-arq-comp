@@ -2,11 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- =============================================================
 -- TESTBENCH DO PROCESSADOR
--- Arquivo obrigatorio: processador_tb.vhd
--- =============================================================
-
 entity processador_tb is
 end entity;
 
@@ -91,7 +87,7 @@ begin
     rst_proc : process
     begin
         rst <= '1';
-        wait for period_time * 2;
+        wait for period_time * 1.25;
         rst <= '0';
         wait;
     end process;
