@@ -2,7 +2,18 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- =============================================================
 -- PROCESSADOR - Top-Level do uProcessador 5
+--
+-- Maquina de 2 estados: 0=FETCH, 1=EXECUTE
+-- IR    : falling_edge, clock-enable via MUX externo
+-- PC    : falling_edge, clock-enable via MUX externo
+-- Banco : rising_edge (dentro do reg16bits)
+--
+-- REGRA: process/if SOMENTE para registrador simples (rst + clk).
+--        Toda logica combinacional fora do process, com when-else.
+-- =============================================================
+
 entity processador is
     port(
         clk : in std_logic;
@@ -27,6 +38,10 @@ end entity;
 
 architecture a_processador of processador is
 
+    -- ---------------------------------------------------------
+    -- Declaracao dos componentes
+    -- ---------------------------------------------------------
+
     component rom is
         port(
             endereco : in  unsigned(6 downto 0);
@@ -34,9 +49,19 @@ architecture a_processador of processador is
         );
     end component;
 
+    component pc is
+        port(
+            clk      : in  std_logic;
+            rst      : in  std_logic;
+            wr_en    : in  std_logic;
+            data_in  : in  unsigned(6 downto 0);
+            data_out : out unsigned(6 downto 0)
+        );
+    end component;
+
     component banco_regs is
         port(
-            clock   : in  std_logic;
+            clk     : in  std_logic;
             rst     : in  std_logic;
             wr_en   : in  std_logic;
             reg_r1  : in  unsigned(3 downto 0);
@@ -44,7 +69,17 @@ architecture a_processador of processador is
             reg_wr  : in  unsigned(3 downto 0);
             data_wr : in  unsigned(15 downto 0);
             data_r1 : out unsigned(15 downto 0);
-            data_r2 : out unsigned(15 downto 0)
+            data_r2 : out unsigned(15 downto 0);
+            out_r0  : out unsigned(15 downto 0);
+            out_r1  : out unsigned(15 downto 0);
+            out_r2  : out unsigned(15 downto 0);
+            out_r3  : out unsigned(15 downto 0);
+            out_r4  : out unsigned(15 downto 0);
+            out_r5  : out unsigned(15 downto 0);
+            out_r6  : out unsigned(15 downto 0);
+            out_r7  : out unsigned(15 downto 0);
+            out_r8  : out unsigned(15 downto 0);
+            out_r9  : out unsigned(15 downto 0)
         );
     end component;
 
@@ -62,56 +97,90 @@ architecture a_processador of processador is
         );
     end component;
 
-    -- REGs
+    -- =========================================================
+    -- REGISTRADORES (usados dentro de process)
+    -- =========================================================
     signal estado  : std_logic;
-    signal reg_pc  : unsigned(6 downto 0);
     signal reg_ir  : unsigned(16 downto 0);
     signal borrow  : std_logic;
 
-    -- FIOS COMBINACIONAIS 
-    signal fio_rom_dado    : unsigned(16 downto 0);
-    signal fio_opcode      : unsigned(3 downto 0);
-    signal fio_ddd         : unsigned(3 downto 0);
-    signal fio_sss         : unsigned(3 downto 0);
-    signal fio_ttt         : unsigned(3 downto 0);
-    signal fio_imm16       : unsigned(15 downto 0);
-    signal fio_jmp_addr    : unsigned(6 downto 0);
+    -- =========================================================
+    -- SINAIS COMBINACIONAIS (usados fora de process)
+    -- =========================================================
 
-    signal fio_ir_din      : unsigned(16 downto 0);
-    signal fio_pc_din      : unsigned(6 downto 0);
-    signal fio_borrow_din  : std_logic;
+    -- ROM
+    signal instrucao_rom   : unsigned(16 downto 0);
 
-    signal fio_wr_en       : std_logic;
-    signal fio_data_r1     : unsigned(15 downto 0);
-    signal fio_data_r2     : unsigned(15 downto 0);
-    
+    -- IR (MUX de entrada)
+    signal prox_ir         : unsigned(16 downto 0);
+
+    -- PC (componente pc)
+    signal pc_atual        : unsigned(6 downto 0);
+    signal prox_pc         : unsigned(6 downto 0);
+    signal pc_wr_en        : std_logic;
+
+    -- Campos decodificados do IR
+    signal opcode          : unsigned(3 downto 0);
+    signal reg_dest        : unsigned(3 downto 0);  -- ddd: registrador destino
+    signal reg_fonte1      : unsigned(3 downto 0);  -- sss: registrador fonte 1
+    signal reg_fonte2      : unsigned(3 downto 0);  -- ttt: registrador fonte 2
+    signal imediato        : unsigned(15 downto 0); -- imm4 estendido para 16 bits
+    signal endereco_salto  : unsigned(6 downto 0);  -- addr7 para JMP
+
+    -- Banco de registradores
+    signal banco_wr_en     : std_logic;
+    signal dado_lido_r1    : unsigned(15 downto 0);
+    signal dado_lido_r2    : unsigned(15 downto 0);
+
     -- ULA
-    signal fio_ula_a       : unsigned(15 downto 0);
-    signal fio_ula_b       : unsigned(15 downto 0);
-    signal fio_ula_op      : unsigned(2 downto 0);
-    signal fio_ula_res     : unsigned(15 downto 0);
-    signal fio_flag_zero   : std_logic;
-    signal fio_flag_neg    : std_logic;
-    signal fio_flag_overf  : std_logic;
-    signal fio_flag_carry  : std_logic;
-    signal fio_mux_banco   : unsigned(15 downto 0);
+    signal ula_entrada_a   : unsigned(15 downto 0);
+    signal ula_entrada_b   : unsigned(15 downto 0);
+    signal ula_op          : unsigned(2 downto 0);
+    signal ula_resultado   : unsigned(15 downto 0);
+    signal flag_zero       : std_logic;
+    signal flag_neg        : std_logic;
+    signal flag_overf      : std_logic;
+    signal flag_carry      : std_logic;
 
-    -- PC
-    signal fio_next_pc     : unsigned(6 downto 0);
-    signal fio_is_jump     : std_logic;
+    -- Borrow (MUX de entrada)
+    signal prox_borrow     : std_logic;
 
-    -- Observacao de registradores
-    signal obs_r0, obs_r1, obs_r2, obs_r3, obs_r4 : unsigned(15 downto 0);
-    signal obs_r5, obs_r6, obs_r7, obs_r8, obs_r9 : unsigned(15 downto 0);
+    -- Desvio
+    signal eh_jump         : std_logic;
 
 begin
 
+    -- =========================================================
+    -- ROM
+    -- =========================================================
     mem_rom : rom port map(
-        endereco => reg_pc,
-        dado     => fio_rom_dado
+        endereco => pc_atual,
+        dado     => instrucao_rom
     );
 
-    -- REGISTRADOR DE ESTADO)
+    -- =========================================================
+    -- PROGRAM COUNTER (componente pc - falling_edge)
+    -- MUX externo: seleciona PC+1 ou endereco de salto.
+    -- Escrita habilitada apenas durante EXECUTE (estado=1).
+    -- =========================================================
+    eh_jump   <= '1' when opcode = "1111" else '0';
+
+    prox_pc   <= endereco_salto when eh_jump = '1' else
+                 pc_atual + 1;
+
+    pc_wr_en  <= '1' when estado = '1' else '0';
+
+    reg_pc_inst : pc port map(
+        clk      => clk,
+        rst      => rst,
+        wr_en    => pc_wr_en,
+        data_in  => prox_pc,
+        data_out => pc_atual
+    );
+
+    -- =========================================================
+    -- REGISTRADOR DE ESTADO (flip-flop T)
+    -- =========================================================
     process(clk, rst)
     begin
         if rst = '1' then
@@ -121,131 +190,124 @@ begin
         end if;
     end process;
 
-    fio_ir_din <= fio_rom_dado when estado = '0' else reg_ir;
+    -- =========================================================
+    -- REGISTRADOR DE INSTRUCOES (IR) - falling_edge
+    -- MUX externo: carrega da ROM no FETCH, mantem no EXECUTE.
+    -- =========================================================
+    prox_ir <= instrucao_rom when estado = '0' else reg_ir;
+
     process(clk, rst)
     begin
         if rst = '1' then
             reg_ir <= (others => '0');
         elsif falling_edge(clk) then
-            reg_ir <= fio_ir_din;
+            reg_ir <= prox_ir;
         end if;
     end process;
 
-    fio_pc_din <= fio_next_pc when estado = '1' else reg_pc;
-    process(clk, rst)
-    begin
-        if rst = '1' then
-            reg_pc <= (others => '0');
-        elsif falling_edge(clk) then
-            reg_pc <= fio_pc_din;
-        end if;
-    end process;
-
-    fio_borrow_din <=
-        fio_flag_carry when (estado = '1' and (fio_opcode = "0010" or fio_opcode = "0011"))
+    -- =========================================================
+    -- REGISTRADOR DE BORROW - rising_edge
+    -- MUX externo: atualiza apenas apos SUB ou SUBB no EXECUTE.
+    -- =========================================================
+    prox_borrow <=
+        flag_carry when (estado = '1' and
+                         (opcode = "0010" or opcode = "0011"))
         else borrow;
+
     process(clk, rst)
     begin
         if rst = '1' then
             borrow <= '0';
         elsif rising_edge(clk) then
-            borrow <= fio_borrow_din;
+            borrow <= prox_borrow;
         end if;
     end process;
 
-    -- DECODIFICADOR 
-    fio_opcode   <= reg_ir(16 downto 13);
-    fio_ddd      <= reg_ir(12 downto  9);
-    fio_sss      <= reg_ir( 8 downto  5);
-    fio_ttt      <= reg_ir( 4 downto  1);
-    fio_jmp_addr <= reg_ir( 6 downto  0);
-    fio_imm16    <= "000000000000" & reg_ir(4 downto 1);
+    -- =========================================================
+    -- DECODIFICADOR (combinacional, fora de process)
+    -- =========================================================
+    opcode         <= reg_ir(16 downto 13);
+    reg_dest       <= reg_ir(12 downto  9);
+    reg_fonte1     <= reg_ir( 8 downto  5);
+    reg_fonte2     <= reg_ir( 4 downto  1);
+    endereco_salto <= reg_ir( 6 downto  0);
+    imediato       <= "000000000000" & reg_ir(4 downto 1);
 
-    fio_wr_en <=
+    -- Write enable do banco: so durante EXECUTE de instrucoes que escrevem
+    banco_wr_en <=
         '1' when (estado = '1' and
-                  (fio_opcode = "0001" or   -- ADD
-                   fio_opcode = "0010" or   -- SUB
-                   fio_opcode = "0011" or   -- SUBB
-                   fio_opcode = "0100" or   -- MOV
-                   fio_opcode = "0101"))    -- LI
+                  (opcode = "0001" or   -- ADD
+                   opcode = "0010" or   -- SUB
+                   opcode = "0011" or   -- SUBB
+                   opcode = "0100" or   -- MOV
+                   opcode = "0101"))    -- LI
         else '0';
 
-    -- Entrada A da ULA 
-    fio_ula_a <= fio_data_r1;
+    -- Entrada A da ULA
+    ula_entrada_a <=
+        x"0000"       when opcode = "0101" else   -- LI:   A = 0
+        dado_lido_r1;                              -- demais: A = Rs
 
     -- Entrada B da ULA
-    fio_ula_b <=
-        x"0000"      when fio_opcode = "0100" else   -- MOV: B = 0
-        fio_data_r2;                                 -- demais: B = Rt
+    ula_entrada_b <=
+        imediato      when opcode = "0101" else   -- LI:   B = imediato
+        x"0000"       when opcode = "0100" else   -- MOV:  B = 0
+        dado_lido_r2;                              -- demais: B = Rt
 
-    -- Operacao da ULA
-    fio_ula_op <=
-        "001" when fio_opcode = "0010" else   -- SUB
-        "010" when fio_opcode = "0011" else   -- SUBB
-        "101" when fio_opcode = "0100" else   -- MOV (passa A)
-        "001" when fio_opcode = "0110" else   -- CMPR (SUB sem escrita)
-        "000";                                -- ADD, NOP, JMP
+    -- Selecao de operacao da ULA
+    ula_op <=
+        "001" when opcode = "0010" else   -- SUB
+        "010" when opcode = "0011" else   -- SUBB
+        "101" when opcode = "0100" else   -- MOV  (passa A)
+        "001" when opcode = "0110" else   -- CMPR (SUB sem escrita)
+        "000";                             -- ADD, LI, NOP, JMP
 
-    -- MUX EXCLUSIVO P LOAD IMMEDIATE (BYPASS DA ULA)
-    fio_mux_banco <= fio_imm16 when fio_opcode = "0101" else fio_ula_res;
-
-    -- Proximo PC
-    fio_is_jump <= '1' when fio_opcode = "1111" else '0';
-    fio_next_pc <=
-        fio_jmp_addr when fio_is_jump = '1' else
-        reg_pc + 1;
-
+    -- =========================================================
     -- BANCO DE REGISTRADORES
+    -- =========================================================
     banco : banco_regs port map(
-        clock   => clk,
+        clk     => clk,
         rst     => rst,
-        wr_en   => fio_wr_en,
-        reg_r1  => fio_sss,
-        reg_r2  => fio_ttt,
-        reg_wr  => fio_ddd,
-        data_wr => fio_mux_banco,
-        data_r1 => fio_data_r1,
-        data_r2 => fio_data_r2
+        wr_en   => banco_wr_en,
+        reg_r1  => reg_fonte1,
+        reg_r2  => reg_fonte2,
+        reg_wr  => reg_dest,
+        data_wr => ula_resultado,
+        data_r1 => dado_lido_r1,
+        data_r2 => dado_lido_r2,
+        out_r0  => out_r0,
+        out_r1  => out_r1,
+        out_r2  => out_r2,
+        out_r3  => out_r3,
+        out_r4  => out_r4,
+        out_r5  => out_r5,
+        out_r6  => out_r6,
+        out_r7  => out_r7,
+        out_r8  => out_r8,
+        out_r9  => out_r9
     );
 
+    -- =========================================================
+    -- ULA
+    -- =========================================================
     alu : ula port map(
-        entrada_A  => fio_ula_a,
-        entrada_B  => fio_ula_b,
-        selec_op   => fio_ula_op,
+        entrada_A  => ula_entrada_a,
+        entrada_B  => ula_entrada_b,
+        selec_op   => ula_op,
         borrow_in  => borrow,
-        resultado  => fio_ula_res,
-        flag_zero  => fio_flag_zero,
-        flag_neg   => fio_flag_neg,
-        flag_overf => fio_flag_overf,
-        flag_carry => fio_flag_carry
+        resultado  => ula_resultado,
+        flag_zero  => flag_zero,
+        flag_neg   => flag_neg,
+        flag_overf => flag_overf,
+        flag_carry => flag_carry
     );
 
-    -- BANCOS DE OBSERVACAo
-    obs_01 : banco_regs port map(
-        clock => clk, rst => rst, wr_en => fio_wr_en, reg_r1 => "0000", reg_r2 => "0001", reg_wr => fio_ddd, data_wr => fio_mux_banco, data_r1 => obs_r0, data_r2 => obs_r1
-    );
-    obs_23 : banco_regs port map(
-        clock => clk, rst => rst, wr_en => fio_wr_en, reg_r1 => "0010", reg_r2 => "0011", reg_wr => fio_ddd, data_wr => fio_mux_banco, data_r1 => obs_r2, data_r2 => obs_r3
-    );
-    obs_45 : banco_regs port map(
-        clock => clk, rst => rst, wr_en => fio_wr_en, reg_r1 => "0100", reg_r2 => "0101", reg_wr => fio_ddd, data_wr => fio_mux_banco, data_r1 => obs_r4, data_r2 => obs_r5
-    );
-    obs_67 : banco_regs port map(
-        clock => clk, rst => rst, wr_en => fio_wr_en, reg_r1 => "0110", reg_r2 => "0111", reg_wr => fio_ddd, data_wr => fio_mux_banco, data_r1 => obs_r6, data_r2 => obs_r7
-    );
-    obs_89 : banco_regs port map(
-        clock => clk, rst => rst, wr_en => fio_wr_en, reg_r1 => "1000", reg_r2 => "1001", reg_wr => fio_ddd, data_wr => fio_mux_banco, data_r1 => obs_r8, data_r2 => obs_r9
-    );
-
+    -- =========================================================
     -- SAIDAS
+    -- =========================================================
     out_estado <= estado;
-    out_pc     <= reg_pc;
+    out_pc     <= pc_atual;
     out_ir     <= reg_ir;
-    out_ula    <= fio_ula_res;
-    out_r0 <= obs_r0;  out_r1 <= obs_r1;
-    out_r2 <= obs_r2;  out_r3 <= obs_r3;
-    out_r4 <= obs_r4;  out_r5 <= obs_r5;
-    out_r6 <= obs_r6;  out_r7 <= obs_r7;
-    out_r8 <= obs_r8;  out_r9 <= obs_r9;
+    out_ula    <= ula_resultado;
 
 end architecture;

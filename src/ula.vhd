@@ -2,15 +2,23 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- selec_op:
+--   000 = ADD    resultado = A + B
+--   001 = SUB    resultado = A - B
+--   010 = SUBB   resultado = A - B - borrow_in
+--   011 = AND    resultado = A and B
+--   100 = OR     resultado = A or B
+--   101 = MOV    resultado = A
+--   outros       resultado = 0
+
 entity ula is
     port(
-        entrada_A : in unsigned(15 downto 0);
-        entrada_B : in unsigned(15 downto 0);
-        selec_op  : in unsigned(2 downto 0);  -- 3 bits: ADD,SUB,SUBB,AND,OR,MOV
-        borrow_in : in std_logic;             -- borrow para SUBB
+        entrada_A  : in  unsigned(15 downto 0);
+        entrada_B  : in  unsigned(15 downto 0);
+        selec_op   : in  unsigned(2 downto 0);
+        borrow_in  : in  std_logic;
 
         resultado  : out unsigned(15 downto 0);
-
         flag_zero  : out std_logic;
         flag_neg   : out std_logic;
         flag_overf : out std_logic;
@@ -18,21 +26,12 @@ entity ula is
     );
 end entity;
 
-architecture arq_ula of ula is
-    signal res_interno  : unsigned(15 downto 0);
-    signal res_ext      : unsigned(16 downto 0);
+architecture a_ula of ula is
+    signal resultado_s : unsigned(15 downto 0);
+    signal soma_ext    : unsigned(16 downto 0); -- bit extra para capturar carry
 begin
 
-    -- selec_op:
-    --   000 = ADD   A + B
-    --   001 = SUB   A - B  (sem borrow)
-    --   010 = SUBB  A - B - borrow_in
-    --   011 = AND   A and B
-    --   100 = OR    A or B
-    --   101 = MOV   passa A (usado por MOV e CLR: B=0 externo)
-    --   outros = zero
-
-    res_ext <=
+    soma_ext <=
         ('0' & entrada_A) + ('0' & entrada_B)
             when selec_op = "000" else
         ('0' & entrada_A) - ('0' & entrada_B)
@@ -47,19 +46,19 @@ begin
             when selec_op = "101" else
         (others => '0');
 
-    res_interno <= res_ext(15 downto 0);
-    resultado   <= res_interno;
+    resultado_s <= soma_ext(15 downto 0);
+    resultado   <= resultado_s;
 
-    flag_zero  <= '1' when res_interno = x"0000" else '0';
-    flag_neg   <= res_interno(15);
-    flag_carry <= res_ext(16);
+    flag_zero  <= '1' when resultado_s = x"0000" else '0';
+    flag_neg   <= resultado_s(15);
+    flag_carry <= soma_ext(16);
 
     flag_overf <=
-        ((    entrada_A(15) and     entrada_B(15) and not res_interno(15)) or
-         (not entrada_A(15) and not entrada_B(15) and     res_interno(15)))
+        ((    entrada_A(15) and     entrada_B(15) and not resultado_s(15)) or
+         (not entrada_A(15) and not entrada_B(15) and     resultado_s(15)))
             when selec_op = "000" else
-        ((    entrada_A(15) and not entrada_B(15) and not res_interno(15)) or
-         (not entrada_A(15) and     entrada_B(15) and     res_interno(15)))
+        ((    entrada_A(15) and not entrada_B(15) and not resultado_s(15)) or
+         (not entrada_A(15) and     entrada_B(15) and     resultado_s(15)))
             when (selec_op = "001" or selec_op = "010") else
         '0';
 
