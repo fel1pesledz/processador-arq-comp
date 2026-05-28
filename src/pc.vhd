@@ -2,8 +2,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Registrador de 7 bits para o Program Counter.
--- Sensivel a borda de descida conforme sorteio.
+-- Registrador de 7 bits para o Program Counter
+-- Borda de descida
 -- Incremento e MUX de selecao (PC+1 vs endereco de salto) ficam no top-level.
 
 entity pc is
