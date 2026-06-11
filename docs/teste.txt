@@ -1,0 +1,18 @@
+
+
+ghdl -a --workdir=src src/reg16bits.vhd
+ghdl -a --workdir=src src/banco_regs.vhd
+ghdl -a --workdir=src src/ula.vhd
+ghdl -a --workdir=src src/pc.vhd
+ghdl -a --workdir=src src/rom.vhd
+ghdl -a --workdir=src src/processador.vhd
+ghdl -a --workdir=src src/processador_tb.vhd
+
+
+ghdl -e --workdir=src processador_tb
+
+
+ghdl -r --workdir=src processador_tb --wave=sim/resultado.ghw
+
+
+gtkwave sim/resultado.ghw

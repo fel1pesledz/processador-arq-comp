@@ -11,10 +11,10 @@ entity banco_regs is
         reg_r1  : in  unsigned(3 downto 0); -- selecao leitura 1
         reg_r2  : in  unsigned(3 downto 0); -- selecao leitura 2
         reg_wr  : in  unsigned(3 downto 0); -- selecao escrita
-        data_wr : in  unsigned(15 downto 0);
+        data_wr : in  unsigned(15 downto 0); -- dado a ser escrito
 
-        data_r1 : out unsigned(15 downto 0);
-        data_r2 : out unsigned(15 downto 0);
+        data_r1 : out unsigned(15 downto 0); -- dado1 para ULA
+        data_r2 : out unsigned(15 downto 0); -- dado2 para ULA
 
         -- saidas diretas de cada registrador (para visualizacao no top-level)
         out_r0  : out unsigned(15 downto 0);
