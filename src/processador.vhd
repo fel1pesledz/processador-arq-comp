@@ -148,8 +148,8 @@ begin
     condicao_atendida <= flag_c_reg when opcode = "1110" else '0';
 
     prox_pc <=
-        offset_salto                                          when eh_jump = '1'                          else
-        unsigned(signed(pc_atual) + signed(offset_salto))    when eh_branch = '1' and condicao_atendida = '1' else
+        offset_salto                                      when eh_jump = '1'                          else
+        unsigned(signed(pc_atual) + signed(offset_salto)) when eh_branch = '1' and condicao_atendida = '1' else
         pc_atual + 1;
 
     pc_wr_en <= '1' when estado = '1' else '0';
@@ -166,7 +166,7 @@ begin
     process(clk, rst)
     begin
         if rst = '1' then
-            estado    <= '1';
+            estado     <= '1';
             flag_z_reg <= '0';
             flag_n_reg <= '0';
             flag_c_reg <= '0';
@@ -207,7 +207,8 @@ begin
         opcode = "0010" or  -- SUB
         opcode = "0011" or  -- SUBB
         opcode = "0100" or  -- MOV
-        opcode = "0101" or  -- LI
+        opcode = "0101" or  -- ADDC
+        opcode = "0111" or  -- CLR
         opcode = "1000"     -- LW
     )) else '0';
 
@@ -215,7 +216,8 @@ begin
         opcode = "0001" or  -- ADD
         opcode = "0010" or  -- SUB
         opcode = "0011" or  -- SUBB
-        opcode = "0110"     -- CMPR
+        opcode = "0110" or  -- CMPR
+        opcode = "0111"     -- CLR
     )) else '0';
 
     ram_wr_en <= '1' when (estado = '1' and opcode = "1001") else '0';  -- SW
@@ -233,14 +235,17 @@ begin
     dado_escrever_banco <= dado_lido_ram when opcode = "1000" else ula_resultado;
 
     ula_entrada_a <= dado_lido_r2 when opcode = "0100" else dado_lido_r1;
-    ula_entrada_b <= imediato     when opcode = "0101" else dado_lido_r2;
+    
+    ula_entrada_b <= imediato     when opcode = "0101" else 
+                     dado_lido_r1 when opcode = "0111" else  -- CLR faz A - A
+                     dado_lido_r2;
 
     ula_op <=
-        "001" when opcode = "0010" else  -- SUB
+        "001" when opcode = "0010" or opcode = "0111" else  -- SUB, CLR
         "010" when opcode = "0011" else  -- SUBB
         "101" when opcode = "0100" else  -- MOV (passa A; entrada_A ja foi trocada para Rs)
         "001" when opcode = "0110" else  -- CMPR
-        "000";                           -- ADD, LI
+        "000";                           -- ADD, ADDC
 
     -- BANCO DE REGISTRADORES
     banco : banco_regs port map(
