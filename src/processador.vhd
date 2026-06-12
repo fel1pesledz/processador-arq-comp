@@ -142,8 +142,8 @@ begin
     );
 
     -- PC e DESVIOS
-    eh_jump   <= '1' when opcode = "1111" else '0';
-    eh_branch <= '1' when (opcode = "1110" or opcode = "1101") else '0';
+    eh_jump   <= '1' when opcode = "1111" else '0'; -- incondicional
+    eh_branch <= '1' when (opcode = "1110" or opcode = "1101") else '0'; -- condicional
 
     -- Resolucao rigorosa das condicoes de branch com base nas flags
     condicao_atendida <= 
