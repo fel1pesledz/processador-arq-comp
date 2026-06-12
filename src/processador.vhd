@@ -141,14 +141,18 @@ begin
         dado     => instrucao_rom
     );
 
-    -- PC
+    -- PC e DESVIOS
     eh_jump   <= '1' when opcode = "1111" else '0';
-    eh_branch <= '1' when opcode = "1110" else '0';
+    eh_branch <= '1' when (opcode = "1110" or opcode = "1101") else '0';
 
-    condicao_atendida <= flag_c_reg when opcode = "1110" else '0';
+    -- Resolucao rigorosa das condicoes de branch com base nas flags
+    condicao_atendida <= 
+        '1' when (opcode = "1110" and (flag_z_reg = '1' or (flag_n_reg /= flag_v_reg))) else  -- BLE
+        '1' when (opcode = "1101" and flag_n_reg = '0') else                                  -- BPL
+        '0';
 
     prox_pc <=
-        offset_salto                                      when eh_jump = '1'                          else
+        offset_salto when eh_jump = '1' else
         unsigned(signed(pc_atual) + signed(offset_salto)) when eh_branch = '1' and condicao_atendida = '1' else
         pc_atual + 1;
 
@@ -171,7 +175,7 @@ begin
             flag_n_reg <= '0';
             flag_c_reg <= '0';
             flag_v_reg <= '0';
-        elsif rising_edge(clk) then
+        elsif falling_edge(clk) then
             estado <= not estado;
             if we_flags = '1' then
                 flag_z_reg <= flag_zero;
