@@ -11,7 +11,7 @@ Formato Arquitetural: 2 Operandos (O Registrador Destino e a Fonte 1 compartilha
 | OPCODE      | REG 1      | REG 2      | IMEDIATO    | FIXO  |
 -------------------------------------------------------------
 * OPCODE (4 bits): Define a operação a ser executada.
-* REG 1 (4 bits): Registrador Destino (Rn) e Primeira Fonte na ULA. Funciona também como ponteiro (endereço) ou fonte nas instruções de memória.
+* REG 1 (4 bits): Registrador Destino (Rn) e Primeira Fonte na ULA. Funciona também como ponteiro (endereço) nas instruções de memória.
 * REG 2 (4 bits): Registrador da Segunda Fonte (Rm).
 * IMEDIATO (8 bits): Valor constante (ocupa das posições 8 a 1).
 * OFFSET SALTO (7 bits): Constante usada em saltos (posições 6 a 0).
@@ -22,12 +22,14 @@ Formato Arquitetural: 2 Operandos (O Registrador Destino e a Fonte 1 compartilha
 | Mnemônico  | Opcode | Categoria | Reg1 (Dest/F1) | Reg2 (Fonte 2) | Imediato / Constante        | Descrição Funcional                                |
 |------------|--------|-----------|----------------|----------------|-----------------------------|----------------------------------------------------|
 | ADD Rn, Rm | 0001   | ULA       | Rn             | Rm             | 0000                        | Rn <- Rn + Rm                                      |
-| SUB Rn, Rm | 0010   | ULA       | Rn             | Rm             | 0000                        | Rn <- Rn - Rm (Também usado para zerar registrador)|
-| SUBB Rn,Rm | 0011   | ULA       | Rn             | Rm             | 0000                        | Rn <- Rn - Rm - Borrow                             |
-| MOV Rn, Rm | 0100   | Transf.   | Rn             | Rm             | 0000                        | Rn <- Rm (Cópia de registradores)                  |
-| LI Rn, imm | 0101   | Carga Cte | Rn             | <------ imm (8 bits) ------> | Rn <- Rn + imm (Requer zerar Rn antes com SUB)     |
-| CMPR Rn, Rm| 0110   | Compar.   | Rn             | Rm             | 0000                        | ULA faz Rn - Rm (Sem Writeback, apenas atualiza flags)|
+| SUB Rn, Rm | 0010   | ULA       | Rn             | Rm             | 0000                        | Rn <- Rn - Rm                                      |
+| SUBB Rn,Rm | 0011   | ULA       | Rn             | Rm             | 0000                        | Rn <- Rn - Rm - Borrow (Usado para cascata)        |
+| MOV Rn, Rm | 0100   | Transf.   | Rn             | Rm             | 0000                        | Rn <- Rm (Cópia direta entre registradores)        |
+| ADDC Rn,imm| 0101   | Carga Cte | Rn             | <------ imm (8 bits) ------> | Rn <- Rn + imm (Requer zerar Rn antes com CLR)     |
+| CMPR Rn, Rm| 0110   | Compar.   | Rn             | Rm             | 0000                        | ULA faz Rn - Rm (Sem Writeback, só atualiza flags) |
+| CLR Rn     | 0111   | ULA       | Rn             | <- ignora ->   | 0000                        | Rn <- Rn - Rn (Zera o registrador via ULA)         |
 | LW Rn, Rptr| 1000   | Memória   | Rn (Destino)   | Rptr (Ponteiro)| 0000                        | Rn <- RAM[Rptr] (Leitura Assíncrona)               |
-| SW Rsrc,Rptr| 1001  | Memória   | Rsrc (Dado)    | Rptr (Ponteiro)| 0000                        | RAM[Rptr] <- Rsrc (Escrita Síncrona)               |
-| JC offset  | 1110   | Desvio    | <- ignora ->   | <- offset relativo (7 bits)->| Se Flag_C=1, PC <- PC + offset (Complemento de 2)  |
+| SW Rsrc,Rpt| 1001   | Memória   | Rsrc (Dado)    | Rptr (Ponteiro)| 0000                        | RAM[Rptr] <- Rsrc (Escrita Síncrona)               |
+| BPL offset | 1101   | Desvio    | <- ignora ->   | <- offset relativo (7 bits)->| Se N=0, PC <- PC + offset (Complemento de 2)       |
+| BLE offset | 1110   | Desvio    | <- ignora ->   | <- offset relativo (7 bits)->| Se Z=1 ou N!=V, PC <- PC + offset                  |
 | JMP addr   | 1111   | Desvio    | <- ignora ->   | <- endereço absoluto (7 bits)->| Pulo incondicional, PC <- addr                     |

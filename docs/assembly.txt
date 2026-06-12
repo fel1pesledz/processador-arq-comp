@@ -1,34 +1,34 @@
 =============================================================
 PROGRAMA TESTE - LAb 7 (MEMÓRIA DE DADOS)
 =============================================================
-Objetivo do Teste: Validar leitura (LW) e escrita (SW) em endereços espaçados utilizando ponteiros via registradores e carga de constantes usando o combo instrucional (SUB + LI).
+Objetivo do Teste: Validar leitura (LW) e escrita (SW) em endereços espaçados utilizando ponteiros via registradores e carga de constantes usando o combo instrucional exigido no sorteio (CLR + ADDC).
 
 Restrições Atendidas:
 1. Endereços variados e espaçados (32 e 64)
 2. Dados variados escritos (170 e 85)
-3. Sem leituras subsequentes imediatas
+3. Sem leituras subsequentes imediatas (isolamento de estágios)
 4. Registradores diferentes para cada etapa
 
-| End. PC | Assembly          | Binário da Instrução    | Acao / Comentario                         |
-|---------|-------------------|-------------------------|-------------------------------------------|
-|   0     | SUB R1, R1        | 0010 0001 0001 0000 0   | Zera R1 (R1 <- R1 - R1)                   |
-|   1     | LI R1, 32         | 0101 0001 00100000 0    | R1 <- 32  (Ponteiro de Escrita A)         |
-|   2     | SUB R2, R2        | 0010 0010 0010 0000 0   | Zera R2                                   |
-|   3     | LI R2, 64         | 0101 0010 01000000 0    | R2 <- 64  (Ponteiro de Escrita B)         |
-|   4     | SUB R3, R3        | 0010 0011 0011 0000 0   | Zera R3                                   |
-|   5     | LI R3, 170        | 0101 0011 10101010 0    | R3 <- 170 (Dado A a ser escrito: 0xAA)    |
-|   6     | SUB R4, R4        | 0010 0100 0100 0000 0   | Zera R4                                   |
-|   7     | LI R4, 85         | 0101 0100 01010101 0    | R4 <- 85  (Dado B a ser escrito: 0x55)    |
-|         |                   |                         |                                           |
-|   8     | SW R3, R1         | 1001 0011 0001 0000 0   | Escreve na RAM: RAM[32] <- 170            |
-|   9     | SW R4, R2         | 1001 0100 0010 0000 0   | Escreve na RAM: RAM[64] <- 85             |
-|         |                   |                         |                                           |
-|   10    | SUB R5, R5        | 0010 0101 0101 0000 0   | Zera R5 (Isolamento para novo ponteiro)   |
-|   11    | LI R5, 32         | 0101 0101 00100000 0    | R5 <- 32  (Ponteiro de Leitura A)         |
-|   12    | SUB R6, R6        | 0010 0110 0110 0000 0   | Zera R6 (Isolamento para novo ponteiro)   |
-|   13    | LI R6, 64         | 0101 0110 01000000 0    | R6 <- 64  (Ponteiro de Leitura B)         |
-|         |                   |                         |                                           |
-|   14    | LW R7, R5         | 1000 0111 0101 0000 0   | Lê da RAM: R7 <- RAM[32] (Receberá 170)   |
-|   15    | LW R8, R6         | 1000 1000 0110 0000 0   | Lê da RAM: R8 <- RAM[64] (Receberá 85)    |
-|   16    | JMP 16            | 1111 000000 0010000     | Fim da execução (Loop Infinito)           |
+| End. PC | Assembly          | Binário da Instrução    | Acao / Comentario                               |
+|---------|-------------------|-------------------------|-------------------------------------------------|
+|   0     | CLR R1            | 0111 0001 0001 0000 0   | Zera R1 (R1 <- R1 - R1)                         |
+|   1     | ADDC R1, 32       | 0101 0001 00100000 0    | R1 <- 32  (Ponteiro de Escrita A)               |
+|   2     | CLR R2            | 0111 0010 0010 0000 0   | Zera R2                                         |
+|   3     | ADDC R2, 64       | 0101 0010 01000000 0    | R2 <- 64  (Ponteiro de Escrita B)               |
+|   4     | CLR R3            | 0111 0011 0011 0000 0   | Zera R3                                         |
+|   5     | ADDC R3, 170      | 0101 0011 10101010 0    | R3 <- 170 (Dado A a ser escrito: 0xAA)          |
+|   6     | CLR R4            | 0111 0100 0100 0000 0   | Zera R4                                         |
+|   7     | ADDC R4, 85       | 0101 0100 01010101 0    | R4 <- 85  (Dado B a ser escrito: 0x55)          |
+|         |                   |                         |                                                 |
+|   8     | SW R3, R1         | 1001 0011 0001 0000 0   | Escreve na RAM: RAM[32] <- 170                  |
+|   9     | SW R4, R2         | 1001 0100 0010 0000 0   | Escreve na RAM: RAM[64] <- 85                   |
+|         |                   |                         |                                                 |
+|   10    | CLR R5            | 0111 0101 0101 0000 0   | Zera R5 (Isolamento para novo ponteiro)         |
+|   11    | ADDC R5, 32       | 0101 0101 00100000 0    | R5 <- 32  (Ponteiro de Leitura A)               |
+|   12    | CLR R6            | 0111 0110 0110 0000 0   | Zera R6 (Isolamento para novo ponteiro)         |
+|   13    | ADDC R6, 64       | 0101 0110 01000000 0    | R6 <- 64  (Ponteiro de Leitura B)               |
+|         |                   |                         |                                                 |
+|   14    | LW R7, R5         | 1000 0111 0101 0000 0   | Lê da RAM: R7 <- RAM[32] (Receberá 170)         |
+|   15    | LW R8, R6         | 1000 1000 0110 0000 0   | Lê da RAM: R8 <- RAM[64] (Receberá 85)          |
+|   16    | JMP 16            | 1111 000000 0010000     | Fim da execução (Loop Infinito)                 |
 =====================================================================================================
