@@ -1,6 +1,6 @@
-=============================================================
-ESPECIFICAÇÃO DA CODIFICAÇÃO DE INSTRUÇÕES (ISA)
-=============================================================
+
+# ESPECIFICAÇÃO DA CODIFICAÇÃO DE INSTRUÇÕES (ISA)
+
 Tamanho da Instrução: 17 bits (Conforme Sorteio)
 Formato Arquitetural: 2 Operandos (O Registrador Destino e a Fonte 1 compartilham o mesmo endereço físico de bits no decodificador).
 
