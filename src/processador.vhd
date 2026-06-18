@@ -91,18 +91,13 @@ architecture a_processador of processador is
     end component;
 
     -- controle
-    signal estado            : std_logic;
-    signal reg_ir            : unsigned(16 downto 0);
-    signal instrucao_rom     : unsigned(16 downto 0);
-    signal prox_ir           : unsigned(16 downto 0);
-    signal pc_atual          : unsigned(6 downto 0);
-    signal prox_pc           : unsigned(6 downto 0);
-    signal pc_wr_en          : std_logic;
-    signal eh_jump           : std_logic;
-    signal eh_branch         : std_logic;
-    signal condicao_atendida : std_logic;
+    signal estado        : std_logic;
+    signal reg_ir        : unsigned(16 downto 0);
+    signal instrucao_rom : unsigned(16 downto 0);
+    signal pc_atual      : unsigned(6 downto 0);
+    signal prox_pc       : unsigned(6 downto 0);
 
-    -- decodificacao do IR: [16:13]=opcode [12:9]=dest/f1 [8:5]=f2 [8:1]=imm [6:0]=offset
+    -- decodificacao do IR: [16:13]=opcode [12:9]=dest/fonte1 [8:5]=fonte2 [8:1]=imm [6:0]=offset
     signal opcode       : unsigned(3 downto 0);
     signal reg_dest     : unsigned(3 downto 0);
     signal reg_fonte1   : unsigned(3 downto 0);
@@ -142,26 +137,16 @@ begin
     );
 
     -- PC e DESVIOS
-    eh_jump   <= '1' when opcode = "1111" else '0'; -- incondicional
-    eh_branch <= '1' when (opcode = "1110" or opcode = "1101") else '0'; -- condicional
-
-    -- Resolucao rigorosa das condicoes de branch com base nas flags
-    condicao_atendida <= 
-        '1' when (opcode = "1110" and (flag_z_reg = '1' or (flag_n_reg /= flag_v_reg))) else  -- BLE
-        '1' when (opcode = "1101" and flag_n_reg = '0') else                                  -- BPL
-        '0';
-
     prox_pc <=
-        offset_salto when eh_jump = '1' else
-        unsigned(signed(pc_atual) + signed(offset_salto)) when eh_branch = '1' and condicao_atendida = '1' else
+        offset_salto                                      when opcode = "1111" else  -- JMP (incondicional)
+        unsigned(signed(pc_atual) + signed(offset_salto)) when opcode = "1110" and (flag_z_reg = '1' or flag_n_reg /= flag_v_reg) else  -- BLE
+        unsigned(signed(pc_atual) + signed(offset_salto)) when opcode = "1101" and flag_n_reg = '0' else  -- BPL
         pc_atual + 1;
-
-    pc_wr_en <= '1' when estado = '1' else '0';
 
     reg_pc_inst : pc port map(
         clk      => clk,
         rst      => rst,
-        wr_en    => pc_wr_en,
+        wr_en    => estado,  -- estado ja e o proprio sinal de habilitacao
         data_in  => prox_pc,
         data_out => pc_atual
     );
@@ -170,7 +155,7 @@ begin
     process(clk, rst)
     begin
         if rst = '1' then
-            estado     <= '1';
+            estado     <= '0';
             flag_z_reg <= '0';
             flag_n_reg <= '0';
             flag_c_reg <= '0';
@@ -187,14 +172,14 @@ begin
     end process;
 
     -- REGISTRADOR DE INSTRUCAO (falling_edge)
-    prox_ir <= instrucao_rom when estado = '0' else reg_ir;
-
     process(clk, rst)
     begin
         if rst = '1' then
             reg_ir <= (others => '0');
         elsif falling_edge(clk) then
-            reg_ir <= prox_ir;
+            if estado = '0' then
+                reg_ir <= instrucao_rom;
+            end if;
         end if;
     end process;
 
@@ -239,15 +224,15 @@ begin
     dado_escrever_banco <= dado_lido_ram when opcode = "1000" else ula_resultado;
 
     ula_entrada_a <= dado_lido_r2 when opcode = "0100" else dado_lido_r1;
-    
-    ula_entrada_b <= imediato     when opcode = "0101" else 
+
+    ula_entrada_b <= imediato     when opcode = "0101" else  -- ADDC
                      dado_lido_r1 when opcode = "0111" else  -- CLR faz A - A
                      dado_lido_r2;
 
     ula_op <=
-        "001" when opcode = "0010" or opcode = "0111" else  -- SUB, CLR
+        "001" when opcode = "0010" or opcode = "0110" or opcode = "0111" else  -- SUB, CMPR, CLR
         "010" when opcode = "0011" else  -- SUBB
-        "101" when opcode = "0100" else  -- MOV (passa A; entrada_A ja foi trocada para Rs)
+        "101" when opcode = "0100" else  -- MOV
         "001" when opcode = "0110" else  -- CMPR
         "000";                           -- ADD, ADDC
 
