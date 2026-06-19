@@ -19,7 +19,8 @@ entity processador is
         out_r6     : out unsigned(15 downto 0);
         out_r7     : out unsigned(15 downto 0);
         out_r8     : out unsigned(15 downto 0);
-        out_r9     : out unsigned(15 downto 0)
+        out_r9     : out unsigned(15 downto 0);
+        bit_debug  : out std_logic          -- '1' = 923 e primo, '0' = composto
     );
 end entity;
 
@@ -128,6 +129,9 @@ architecture a_processador of processador is
     signal dado_lido_ram       : unsigned(15 downto 0);
     signal ram_wr_en           : std_logic;
 
+    -- saida interna de R9 para bit_debug
+    signal out_r9_interno : unsigned(15 downto 0);
+
 begin
 
     -- ROM
@@ -146,7 +150,7 @@ begin
     reg_pc_inst : pc port map(
         clk      => clk,
         rst      => rst,
-        wr_en    => estado,  -- estado ja e o proprio sinal de habilitacao
+        wr_en    => estado,
         data_in  => prox_pc,
         data_out => pc_atual
     );
@@ -191,6 +195,9 @@ begin
     offset_salto <= reg_ir( 6 downto  0);
     imediato     <= "00000000" & reg_ir(8 downto 1);
 
+    -- -------------------------------------------------------
+    -- Habilitacao de escrita no banco de registradores
+    -- -------------------------------------------------------
     banco_wr_en <= '1' when (estado = '1' and (
         opcode = "0001" or  -- ADD
         opcode = "0010" or  -- SUB
@@ -198,7 +205,8 @@ begin
         opcode = "0100" or  -- MOV
         opcode = "0101" or  -- ADDC
         opcode = "0111" or  -- CLR
-        opcode = "1000"     -- LW
+        opcode = "1000" or  -- LW
+        opcode = "1010"     -- INC
     )) else '0';
 
     we_flags <= '1' when (estado = '1' and (
@@ -225,16 +233,17 @@ begin
 
     ula_entrada_a <= dado_lido_r2 when opcode = "0100" else dado_lido_r1;
 
-    ula_entrada_b <= imediato     when opcode = "0101" else  -- ADDC
-                     dado_lido_r1 when opcode = "0111" else  -- CLR faz A - A
+    -- INC usa B = x"0001" (incremento constante de 1)
+    ula_entrada_b <= imediato         when opcode = "0101" else  -- ADDC: B = imediato
+                     x"0001"          when opcode = "1010" else  -- INC:  B = 1
+                     dado_lido_r1     when opcode = "0111" else  -- CLR:  A - A
                      dado_lido_r2;
 
     ula_op <=
         "001" when opcode = "0010" or opcode = "0110" or opcode = "0111" else  -- SUB, CMPR, CLR
         "010" when opcode = "0011" else  -- SUBB
         "101" when opcode = "0100" else  -- MOV
-        "001" when opcode = "0110" else  -- CMPR
-        "000";                           -- ADD, ADDC
+        "000";                           -- ADD, ADDC, INC  (A + B)
 
     -- BANCO DE REGISTRADORES
     banco : banco_regs port map(
@@ -256,7 +265,7 @@ begin
         out_r6  => out_r6,
         out_r7  => out_r7,
         out_r8  => out_r8,
-        out_r9  => out_r9
+        out_r9  => out_r9_interno
     );
 
     -- ULA
@@ -277,5 +286,9 @@ begin
     out_pc     <= pc_atual;
     out_ir     <= reg_ir;
     out_ula    <= ula_resultado;
+    out_r9     <= out_r9_interno;
+
+    -- BIT DEBUG: '1' se R9 /= 0 (ISPRIME=1 => 923 eh primo), '0' se R9=0 (composto)
+    bit_debug  <= '1' when out_r9_interno /= x"0000" else '0';
 
 end architecture;

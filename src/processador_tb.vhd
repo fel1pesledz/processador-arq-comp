@@ -24,7 +24,8 @@ architecture a_tb of processador_tb is
             out_r6     : out unsigned(15 downto 0);
             out_r7     : out unsigned(15 downto 0);
             out_r8     : out unsigned(15 downto 0);
-            out_r9     : out unsigned(15 downto 0)
+            out_r9     : out unsigned(15 downto 0);
+            bit_debug  : out std_logic
         );
     end component;
 
@@ -38,6 +39,7 @@ architecture a_tb of processador_tb is
     signal ir       : unsigned(16 downto 0);
     signal ula      : unsigned(15 downto 0);
     signal r0, r1, r2, r3, r4, r5, r6, r7, r8, r9 : unsigned(15 downto 0);
+    signal bit_debug : std_logic;
 
 begin
 
@@ -45,7 +47,8 @@ begin
         clk => clk, rst => rst, out_estado => estado, out_pc => pc,
         out_ir => ir, out_ula => ula, out_r0 => r0, out_r1 => r1,
         out_r2 => r2, out_r3 => r3, out_r4 => r4, out_r5 => r5,
-        out_r6 => r6, out_r7 => r7, out_r8 => r8, out_r9 => r9
+        out_r6 => r6, out_r7 => r7, out_r8 => r8, out_r9 => r9,
+        bit_debug => bit_debug
     );
 
     clk_proc : process
@@ -70,7 +73,7 @@ begin
     sim_time_proc : process
     begin
         -- 30 iteracoes de loop demoram aprox 25us. Tempo de sobra.
-        wait for 80 us; 
+        wait for 800 us; 
         finished <= '1';
         wait;
     end process;
