@@ -4,16 +4,21 @@
   UTFPR - Eng. Computacao - Prof. Juliano
 ===============================================================
 
-RESTRICOES DO SORTEIO APLICADAS:
+ESPECIFICACOES SORTEIOS:
+  - Número de registradores: 10
   - ADD apenas entre registradores (nunca com constantes)
   - SUB apenas entre registradores (nunca com constantes)
+  - ADD ops apenas com dois operandos
+  - SUB ops apenas com dois operandos
   - SUB sem borrow (SUB) e com borrow (SUBB) ambos presentes
   - Comparacao apenas entre registradores (CMPR)
+  - Saltos condicionais: BLE e BPL
+  - Salto absoluto: JMP
   - ULA ortogonal: qualquer registrador pode ser destino
-  - Carga de constante: via instrucao LI (implementada como
-    "CLR Rn" + soma com imediato internamente)
+  - Carga de constante: soma cte via ADDC Rd, imm8 (imediato de 8 bits) com um Rn zerado por CLR Rn
   - Registrador de Instrucoes (IR) sensivel a falling_edge
   - PC sensivel a falling_edge
+  - Leitura da ROM assíncrona
 
 ---------------------------------------------------------------
 FORMATO DE INSTRUCAO (17 bits, MSB = bit 16)
@@ -25,13 +30,18 @@ FORMATO DE INSTRUCAO (17 bits, MSB = bit 16)
 
   onde:
     opcode = op3..op0  (4 bits, bits 16..13)
-    ddd    = registrador destino  (4 bits, bits 12..9)
-    sss    = registrador fonte 1  (4 bits, bits 8..5)
-    ttt    = registrador fonte 2  (4 bits, bits 4..1)
+    ddd    = registrador destino / reg_fonte1  (4 bits, bits 12..9)
+    sss    = registrador fonte 2               (4 bits, bits 8..5)
+    ttt    = registrador fonte 3               (4 bits, bits 4..1)
     x      = bit irrelevante (bit 0)
 
-  Para LI (carga de imediato):
-    ttt = imm4 (imediato de 4 bits, valor 0..15)
+  Para ADDC (carga/soma de imediato):
+    bits 8..1 = imm8 (imediato de 8 bits sem sinal, valor 0..255)
+    Decodificado como: imediato <= "00000000" & reg_ir(8 downto 1)
+
+  Para instrucoes de salto relativo (BLE, BPL):
+    bits 6..0 = offset com sinal (complemento de 2, 7 bits, -64..+63)
+    PC_novo = PC_atual + offset  (PC_atual ja aponta para a instrucao SEGUINTE)
 
   Para JMP (salto absoluto):
     bits 6..0 = endereco de destino (7 bits, 0..127)
@@ -41,37 +51,65 @@ FORMATO DE INSTRUCAO (17 bits, MSB = bit 16)
 TABELA DE OPCODES
 ---------------------------------------------------------------
 
-  Opcode | Mnemonico  | Operacao                      | Formato
-  -------|------------|-------------------------------|--------
-  0000   | NOP        | sem operacao                  | -
-  0001   | ADD Rd,Rs,Rt | Rd <= Rs + Rt               | ddd sss ttt x
-  0010   | SUB Rd,Rs,Rt | Rd <= Rs - Rt  (sem borrow) | ddd sss ttt x
-  0011   | SUBB Rd,Rs,Rt| Rd <= Rs - Rt - borrow      | ddd sss ttt x
-  0100   | MOV Rd, Rs  | Rd <= Rs                     | ddd sss 0000 x
-  0101   | LI  Rd, imm4| Rd <= imm4  (0..15)          | ddd 0000 imm4 x
-  0110   | CMPR Rs, Rt | flags <= Rs - Rt (sem escrita)| 0000 sss ttt x
-  1111   | JMP addr7   | PC <= addr7                  | 0000000 addr(7 bits)
+  Opcode | Mnemonico       | Operacao                            | Atualiza flags | Escreve reg
+  -------|-----------------|-------------------------------------|----------------|------------
+  0000   | NOP             | sem operacao                        | nao            | nao
+  0001   | ADD  Rd, Rs     | Rd <= Rd + Rs                       | sim            | sim
+  0010   | SUB  Rd, Rs     | Rd <= Rd - Rs  (sem borrow)         | sim            | sim
+  0011   | SUBB Rd, Rs     | Rd <= Rd - Rs - C  (com borrow)     | sim            | sim
+  0100   | MOV  Rd, Rs     | Rd <= Rs  (Rs = campo sss [8:5])    | nao            | sim
+  0101   | ADDC Rd, imm8   | Rd <= Rd + imm8  (imm nos bits 8..1)| nao            | sim
+  0110   | CMPR Rs1, Rs2   | flags <= Rs1 - Rs2 (sem escrita)    | sim            | nao
+  0111   | CLR  Rd         | Rd <= 0  (internamente: Rd - Rd)    | sim            | sim
+  1000   | LW   Rd, Rend   | Rd <= RAM[Rend]  (Rend = sss)      | nao            | sim
+  1001   | SW   Rsrc, Rend | RAM[Rend] <= Rsrc                   | nao            | nao
+  1010   | INC  Rd         | Rd <= Rd + 1                        | nao            | sim
+  1101   | BPL  offset7    | se N=0: PC <= PC + offset (relativo) | nao           | nao
+  1110   | BLE  offset7    | se Z=1 OU N!=V: PC <= PC + offset   | nao            | nao
+  1111   | JMP  addr7      | PC <= addr7  (incondicional)        | nao            | nao
 
-  NOTA: A instrucao com todos os bits em zero (0x00000) e NOP. OK.
-  NOTA: O endereco 0x00 NAO e NOP (e LI R3,5). OK.
+  NOTA: A instrucao com todos os bits em zero (0x00000) e NOP.
   NOTA: O bit 0 e sempre irrelevante (x).
+  NOTA: ADDC permite carregar qualquer valor 0..255 em um registrador
+        (substitui o antigo LI de 4 bits); para valores maiores usar
+        multiplos ADDC somados ao mesmo registrador (ex: R7=923 usa
+        ADDC R7,255 tres vezes + ADDC R7,158).
+
+---------------------------------------------------------------
+DECODIFICACAO DOS CAMPOS NO PROCESSADOR
+---------------------------------------------------------------
+
+  opcode       <= reg_ir(16 downto 13)
+  reg_dest     <= reg_ir(12 downto  9)   -- destino de escrita
+  reg_fonte1   <= reg_ir(12 downto  9)   -- leitura porta 1 (mesmo campo que dest)
+  reg_fonte2   <= reg_ir( 8 downto  5)   -- leitura porta 2
+  offset_salto <= reg_ir( 6 downto  0)   -- offset relativo (BLE/BPL) ou abs (JMP)
+  imediato     <= "00000000" & reg_ir(8 downto 1)  -- imm8 para ADDC
+
+  Mapeamento para a ULA:
+    ula_entrada_a <= dado_lido_r2        quando MOV  (passa Rs pelo lado A)
+                  <= dado_lido_r1        demais casos
+    ula_entrada_b <= imediato            quando ADDC
+                  <= x"0001"            quando INC
+                  <= dado_lido_r1        quando CLR  (A - A = 0)
+                  <= dado_lido_r2        demais casos
 
 ---------------------------------------------------------------
 REGISTRADORES
 ---------------------------------------------------------------
 
-  Nome | Codigo (ddd/sss/ttt)
-  -----|---------------------
-  R0   | 0000
-  R1   | 0001
-  R2   | 0010
-  R3   | 0011
-  R4   | 0100
-  R5   | 0101
-  R6   | 0110
-  R7   | 0111
-  R8   | 1000
-  R9   | 1001
+  Nome | Codigo (ddd/sss/ttt) | Uso convencional no programa
+  -----|---------------------|------------------------------
+  R0   | 0000                 | uso geral
+  R1   | 0001                 | contador / indice de loop
+  R2   | 0010                 | passo de incremento
+  R3   | 0011                 | limite superior (32)
+  R4   | 0100                 | constante zero (para SW de 0)
+  R5   | 0101                 | indice percorredor da tabela
+  R6   | 0110                 | valor lido da RAM (primo candidato / divisor)
+  R7   | 0111                 | N (numerador / dividendo = 923)
+  R8   | 1000                 | REM (resto corrente da divisao)
+  R9   | 1001                 | flag de resultado: 1=primo, 0=composto
 
 ---------------------------------------------------------------
 DETALHES DA ULA (3 bits de selecao)
@@ -86,20 +124,108 @@ DETALHES DA ULA (3 bits de selecao)
   100      | OR   (A or B)
   101      | MOV  (passa A diretamente)
 
+  Flags geradas (todas combinacionais, registradas no falling_edge de execute):
+    flag_zero  : resultado == 0
+    flag_neg   : resultado(15) == 1  (bit de sinal)
+    flag_carry : soma_ext(16) -- bit extra de carry/borrow
+    flag_overf : overflow de sinal (logica distinta para ADD e SUB/SUBB)
+
+  Instrucoes que habilitam escrita nas flags (we_flags='1'):
+    ADD, SUB, SUBB, CMPR, CLR
+
+  Instrucoes que NAO alteram flags:
+    ADDC, MOV, INC, LW, SW, BLE, BPL, JMP, NOP
+
+  borrow_in da ULA (para SUBB) vem de flag_c_reg (carry/borrow anterior).
+
 ---------------------------------------------------------------
-CARGA DE CONSTANTES (restricao do sorteio)
+CARGA DE CONSTANTES
 ---------------------------------------------------------------
 
-  A restricao exige "Soma a constante com um Rn zerado por CLR Rn".
-  Implementacao:
-    A instrucao LI Rd, imm4 internamente faz:
-      ula_A = 0 (zero forcado)
-      ula_B = imm4 (zero-extended para 16 bits)
-      ula_op = ADD
-      resultado = 0 + imm4 = imm4
-    Isso e equivalente a: CLR Rd, depois ADD Rd com constante.
+  ADDC Rd, imm8  =>  Rd <= Rd + imm8
+  Imediato de 8 bits (0..255) nos bits [8:1] da instrucao.
 
-  Limitacao: imediato de 4 bits, valores 0..15.
-  Para valores maiores, usar operacoes de ADD entre registradores.
+  Para carregar um valor do zero: CLR Rd primeiro, depois ADDC Rd, valor.
+  Para valores > 255: encadear varios ADDC ao mesmo registrador.
+
+  Exemplo (carregar 923 em R7):
+    CLR  R7             ; R7 = 0
+    ADDC R7, 255        ; R7 = 255
+    ADDC R7, 255        ; R7 = 510
+    ADDC R7, 255        ; R7 = 765
+    ADDC R7, 158        ; R7 = 923
+
+---------------------------------------------------------------
+INSTRUCOES DE DESVIO
+---------------------------------------------------------------
+
+  BLE offset7  (opcode 1110):
+    Condicao: Z=1  OU  N != V  (menor ou igual, com sinal)
+    PC_novo = PC_atual + sign_extend(offset7)
+
+  BPL offset7  (opcode 1101):
+    Condicao: N=0  (resultado positivo ou zero)
+    PC_novo = PC_atual + sign_extend(offset7)
+
+  JMP addr7  (opcode 1111):
+    Incondicional. PC_novo = addr7 (absoluto, 0..127)
+
+  ATENCAO: PC_atual no calculo do offset ja foi incrementado para
+  apontar para a instrucao seguinte (ciclo de execute). Portanto:
+    - Para voltar 3 instrucoes: offset = -3
+    - Para pular 2 instrucoes a frente: offset = +2
+
+---------------------------------------------------------------
+MEMORIA
+---------------------------------------------------------------
+
+  ROM: 128 posicoes x 17 bits  (enderecos 0..127, 7 bits)
+  RAM: 128 posicoes x 16 bits  (enderecos 0..127, 7 bits)
+       endereco = dado_lido_r2(6 downto 0)
+       SW: dado_in = dado_lido_r1  (campo ddd [12:9])
+       LW: dado_out -> reg_dest    (campo ddd [12:9])
+
+---------------------------------------------------------------
+MAQUINA DE ESTADOS (2 estados, falling_edge)
+---------------------------------------------------------------
+
+  estado = 0  ->  FETCH:    reg_ir <= instrucao_rom (leitura da ROM)
+  estado = 1  ->  EXECUTE:  operacao executada, flags e PC atualizados
+                             banco de registradores e RAM escritos se habilitado
+
+  PC e IR sao sensiveis a falling_edge do clock.
+  O PC e atualizado no falling_edge do estado de EXECUTE (estado=1->0).
+
+---------------------------------------------------------------
+SAIDAS DO PROCESSADOR (TOP-LEVEL)
+---------------------------------------------------------------
+
+  out_estado : std_logic         -- estado atual da maquina (0=fetch, 1=execute)
+  out_pc     : unsigned(6..0)    -- Program Counter atual
+  out_ir     : unsigned(16..0)   -- Instruction Register atual
+  out_ula    : unsigned(15..0)   -- saida combinacional da ULA
+  out_r0..r9 : unsigned(15..0)   -- conteudo de cada registrador
+  bit_debug  : std_logic         -- '1' se R9 != 0  (923 e primo)
+                                 -- '0' se R9  = 0  (923 e composto)
+
+---------------------------------------------------------------
+PROGRAMA IMPLEMENTADO NA ROM - CRIVO / PRIMALIDADE DE 923
+---------------------------------------------------------------
+
+  Algoritmo: Crivo de Eratostenes parcial para primos ate 32,
+  seguido de teste de divisibilidade de 923 por cada primo encontrado.
+  Divisao implementada por subtracao repetida.
+
+  Resultado esperado: R9 = 1 (bit_debug = '1')  =>  923 e PRIMO.
+
+  Bloco 1 (addr 0..8):   Inicializa RAM[1..32] com RAM[i]=i
+  Bloco 2a (addr 9..16): Elimina multiplos de 2  (marca RAM[i]=0)
+  Bloco 2b (addr 17..24):Elimina multiplos de 3
+  Bloco 2c (addr 25..32):Elimina multiplos de 5
+  Bloco 3 (addr 33..38): Percorre RAM[2..32] exibindo primos em R6
+  Bloco 4 (addr 39..65): Testa se 923 e divisivel por algum primo
+                          da tabela; se divisivel: R9=0 e halt;
+                          se nenhum divisor: R9=1 permanece e halt.
+  HALT (addr 65):        JMP 65  (loop infinito)
 
 ===============================================================

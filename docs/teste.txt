@@ -1,13 +1,9 @@
 Get-ChildItem -Path . -Include *.cf, *.o -Recurse | Remove-Item -Force
 
-# 1. Analisar todos os arquivos VHDL (sempre o tb por último)
 ghdl -a reg16bits.vhd pc.vhd banco_regs.vhd ula.vhd ram.vhd rom.vhd processador.vhd processador_tb.vhd
 
-# 2. Elaborar o executável da simulação
 ghdl -e processador_tb
 
-# 3. Rodar a simulação e gerar as ondas
 ghdl -r processador_tb --wave=simulacao.ghw
 
-# 4. Abrir o visualizador
 gtkwave simulacao.ghw

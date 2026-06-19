@@ -73,7 +73,7 @@ begin
     sim_time_proc : process
     begin
         -- 30 iteracoes de loop demoram aprox 25us. Tempo de sobra.
-        wait for 800 us; 
+        wait for 1200 us; 
         finished <= '1';
         wait;
     end process;
